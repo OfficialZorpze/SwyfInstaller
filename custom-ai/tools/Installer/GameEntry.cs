@@ -20,14 +20,22 @@ internal static class GameEntry
             call.ReturnType.FullName == "System.Boolean" && call.DeclaringType.FullName == type && call.Name == name;
         bool IsFalseBranch(int index) => (code[index].OpCode == OpCodes.Brfalse || code[index].OpCode == OpCodes.Brfalse_S) &&
             code[index].Operand is Instruction target && target.OpCode == OpCodes.Ldc_I4_0 && target.Next?.OpCode == OpCodes.Ret;
+        var hasCustomProviderGate = code[4].OpCode == OpCodes.Call &&
+            code[4].Operand is MethodReference custom && custom.Name == "UseCustomProviderForGameEntry" &&
+            custom.DeclaringType.FullName == "Swyf.CustomAI.Runtime" && !custom.HasThis &&
+            custom.Parameters.Count == 0 && custom.ReturnType.FullName == "System.Boolean";
+        var offset = hasCustomProviderGate ? 4 : 0;
         if (!IsSteamCall(0, "SteamManager", "get_Initialized") || !IsFalseBranch(1) ||
             !IsSteamCall(2, "Steamworks.SteamUser", "BLoggedOn") || !IsFalseBranch(3) ||
-            !ReferenceEquals(code[1].Operand, code[3].Operand) || code[4].OpCode != OpCodes.Ldarg_0 ||
-            code[5].OpCode != OpCodes.Call || code[5].Operand is not MethodReference backend ||
+            !ReferenceEquals(code[1].Operand, code[3].Operand) ||
+            (hasCustomProviderGate && ((code[5].OpCode != OpCodes.Brfalse && code[5].OpCode != OpCodes.Brfalse_S) ||
+                !ReferenceEquals(code[5].Operand, code[8]) || code[6].OpCode != OpCodes.Ldc_I4_1 || code[7].OpCode != OpCodes.Ret)) ||
+            code[offset + 4].OpCode != OpCodes.Ldarg_0 ||
+            code[offset + 5].OpCode != OpCodes.Call || code[offset + 5].Operand is not MethodReference backend ||
             backend.Name != "get_BackendAuthenticated" || backend.DeclaringType.FullName != "KolkataApi" ||
-            !backend.HasThis || backend.Parameters.Count != 0 || backend.ReturnType.FullName != "System.Boolean" || !IsFalseBranch(6))
+            !backend.HasThis || backend.Parameters.Count != 0 || backend.ReturnType.FullName != "System.Boolean" || !IsFalseBranch(offset + 6))
             Fail();
-        return code[4];
+        return code[offset + 4];
     }
 
     private static void Fail() => throw new InvalidOperationException("Incompatible game update: the Steam and AI-service game-entry gates have changed.");
