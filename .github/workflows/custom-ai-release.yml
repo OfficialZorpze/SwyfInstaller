@@ -20,11 +20,6 @@ jobs:
     # Configure a Windows self-hosted runner with the "swyf-game" label and
     # SWYF_GAME_DIR set to the installed Scam With Your Friends directory.
     runs-on: [self-hosted, Windows, X64, swyf-game]
-    # Keep SDK installation in the runner's writable temporary directory.
-    # This avoids requiring the runner account to write to Program Files.
-    env:
-      DOTNET_INSTALL_DIR: ${{ runner.temp }}\\.dotnet
-      DOTNET_ROOT: ${{ runner.temp }}\\.dotnet
     steps:
       - name: Check out source
         uses: actions/checkout@v4
@@ -33,11 +28,13 @@ jobs:
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 10.0.x
+          install-dir: ${{ runner.temp }}\\.dotnet
 
       - name: Build and package
         shell: powershell
         env:
           SWYF_GAME_DIR: ${{ vars.SWYF_GAME_DIR }}
+          DOTNET_ROOT: ${{ runner.temp }}\\.dotnet
         run: |
           if ([string]::IsNullOrWhiteSpace($env:SWYF_GAME_DIR)) {
             throw "Set the SWYF_GAME_DIR repository variable to the game install directory on this self-hosted runner."
@@ -58,7 +55,7 @@ jobs:
         run: |
           if ($env:REF_TYPE -eq "tag") { $tag = $env:REF_NAME }
           else { $tag = $env:INPUT_TAG.Trim() }
-          if ($tag -notmatch '^custom-ai-v[0-9]+\\.[0-9]+\\.[0-9]+$') {
+          if ($tag -notmatch '^custom-ai-v[0-9]+\.[0-9]+\.[0-9]+$') {
             throw "Tag must look like custom-ai-v1.1.6"
           }
           "tag=$tag" >> $env:GITHUB_OUTPUT
