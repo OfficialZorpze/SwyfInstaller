@@ -43,7 +43,7 @@ public static class Program
                 Process.GetProcessesByName("SWYF.CustomAI.Panel").Length > 0))
                 throw new InvalidOperationException("Close the game first.");
             Manifest? manifest = File.Exists(manifestPath) ? JsonSerializer.Deserialize<Manifest>(File.ReadAllText(manifestPath)) : null;
-            if (manifest != null && (manifest.Version is not (1 or 2 or 3 or 4 or 5 or 6 or 7 or 8 or 9) || manifest.Files == null || manifest.Files.Length != 2 ||
+            if (manifest != null && (manifest.Version is not (1 or 2 or 3 or 4 or 5 or 6 or 7 or 8 or 9 or 10) || manifest.Files == null || manifest.Files.Length != 2 ||
                 manifest.Files.Any(x => x == null || !GameFiles.Contains(x.Name) || !ValidHash(x.OriginalHash) || !ValidHash(x.PatchedHash)) ||
                 manifest.Files.Select(x => x.Name).Distinct().Count() != 2))
                 throw new InvalidOperationException("Invalid installation manifest.");
@@ -75,7 +75,7 @@ public static class Program
             // Select the current clean files (or verified backups for files still carrying our patch).
             var sources = new Dictionary<string, string>();
             var observedHashes = new Dictionary<string, string>();
-            bool needsRepair = manifest == null || manifest.Version < 9;
+            bool needsRepair = manifest == null || manifest.Version < 10;
             foreach (var name in GameFiles)
             {
                 var live = Path.Combine(managed, name);
@@ -85,7 +85,7 @@ public static class Program
                 {
                     var backup = Backup(record); RequireHash(backup, record.OriginalHash);
                     sources[name] = backup;
-                    VerifyPatched(live, name == "ScriptsAssDef.dll" ? (manifest!.Version == 1 ? 2 : 3) : (manifest!.Version == 4 ? 4 : manifest.Version >= 7 ? CurrentAiHookCount(live, manifest.Version == 8) : 2),
+                    VerifyPatched(live, name == "ScriptsAssDef.dll" ? (manifest!.Version == 1 ? 2 : 3) : (manifest!.Version == 4 ? 4 : manifest.Version >= 7 ? CurrentAiHookCount(live, manifest.Version == 8 || manifest.Version >= 10) : 2),
                         manifest.Version == 5 ? "ConfigureBackend" : manifest.Version >= 6 ? "EnsureInitialized" : null);
                 }
                 else { Compatibility.RequireUnpatched(live); sources[name] = live; needsRepair = true; }
@@ -115,7 +115,7 @@ public static class Program
                     File.Copy(sources[name], backup);
                 RequireHash(backup, originalHash);
                 Patch(backup, Path.Combine(stage, name), bridge, managed);
-                VerifyPatched(Path.Combine(stage, name), name == "ScriptsAssDef.dll" ? 3 : CurrentAiHookCount(backup, false), "EnsureInitialized");
+                VerifyPatched(Path.Combine(stage, name), name == "ScriptsAssDef.dll" ? 3 : CurrentAiHookCount(backup, true), "EnsureInitialized");
                 records.Add(new(name, originalHash, Hash(Path.Combine(stage, name))));
             }
             // Catch a concurrent Steam update before touching live files.
@@ -135,7 +135,7 @@ public static class Program
                 AtomicCopy(bridge, Path.Combine(managed, BridgeName));
                 foreach (var name in GameFiles) AtomicCopy(Path.Combine(stage, name), Path.Combine(managed, name));
                 File.Delete(legacyConfig);
-                var installed = new Manifest(9, records.ToArray()) { Extra = manifest?.Extra };
+                var installed = new Manifest(10, records.ToArray()) { Extra = manifest?.Extra };
                 File.WriteAllText(manifestPath + ".tmp", JsonSerializer.Serialize(installed, new JsonSerializerOptions { WriteIndented = true }));
                 File.Move(manifestPath + ".tmp", manifestPath, true);
             }
@@ -209,6 +209,18 @@ public static class Program
                 var freezeIl = freeze.Body.GetILProcessor(); var start = freeze.Body.Instructions[0];
                 freezeIl.InsertBefore(start, freezeIl.Create(OpCodes.Ldarg_1));
                 freezeIl.InsertBefore(start, freezeIl.Create(OpCodes.Call, Import("PrepareConversation")));
+            }
+            // Once Steam initialization and login have passed, allow the validated custom provider
+            // to satisfy only the original AI-backend entry requirement.
+            var entry = GameEntry.Getter(assembly);
+            if (entry != null)
+            {
+                var backendGate = GameEntry.BackendGate(entry);
+                var entryIl = entry.Body.GetILProcessor();
+                entryIl.InsertBefore(backendGate, entryIl.Create(OpCodes.Call, Import("UseCustomProviderForGameEntry")));
+                entryIl.InsertBefore(backendGate, entryIl.Create(OpCodes.Brfalse, backendGate));
+                entryIl.InsertBefore(backendGate, entryIl.Create(OpCodes.Ldc_I4_1));
+                entryIl.InsertBefore(backendGate, entryIl.Create(OpCodes.Ret));
             }
         }
         else
