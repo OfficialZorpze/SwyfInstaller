@@ -24,17 +24,24 @@ jobs:
       - name: Check out source
         uses: actions/checkout@v4
 
-      - name: Set up .NET 10
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: 10.0.x
-          install-dir: ${{ runner.temp }}\\.dotnet
+      - name: Install .NET 10 into runner temp
+        shell: powershell
+        run: |
+          $installDir = Join-Path $env:RUNNER_TEMP ".dotnet"
+          New-Item -ItemType Directory -Force -Path $installDir | Out-Null
+          $installer = Join-Path $env:RUNNER_TEMP "dotnet-install.ps1"
+          Invoke-WebRequest -Uri "https://dot.net/v1/dotnet-install.ps1" -OutFile $installer
+          & $installer -Channel "10.0" -InstallDir $installDir -NoPath
+          if ($LASTEXITCODE -ne 0) { throw "The .NET 10 installation failed with exit code $LASTEXITCODE." }
+          Add-Content -Path $env:GITHUB_PATH -Value $installDir
+          Add-Content -Path $env:GITHUB_ENV -Value "DOTNET_ROOT=$installDir"
+          & (Join-Path $installDir "dotnet.exe") --info
+          if ($LASTEXITCODE -ne 0) { throw ".NET was installed but could not be started." }
 
       - name: Build and package
         shell: powershell
         env:
           SWYF_GAME_DIR: ${{ vars.SWYF_GAME_DIR }}
-          DOTNET_ROOT: ${{ runner.temp }}\\.dotnet
         run: |
           if ([string]::IsNullOrWhiteSpace($env:SWYF_GAME_DIR)) {
             throw "Set the SWYF_GAME_DIR repository variable to the game install directory on this self-hosted runner."
