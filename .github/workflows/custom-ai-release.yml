@@ -32,11 +32,17 @@ jobs:
           $installer = Join-Path $env:RUNNER_TEMP "dotnet-install.ps1"
           Invoke-WebRequest -Uri "https://dot.net/v1/dotnet-install.ps1" -OutFile $installer
           & $installer -Channel "10.0" -InstallDir $installDir -NoPath
-          if ($LASTEXITCODE -ne 0) { throw "The .NET 10 installation failed with exit code $LASTEXITCODE." }
+          $dotnetExe = Join-Path $installDir "dotnet.exe"
+          if (-not (Test-Path $dotnetExe)) {
+            throw "The .NET installer finished but dotnet.exe was not found at $dotnetExe."
+          }
           Add-Content -Path $env:GITHUB_PATH -Value $installDir
           Add-Content -Path $env:GITHUB_ENV -Value "DOTNET_ROOT=$installDir"
-          & (Join-Path $installDir "dotnet.exe") --info
-          if ($LASTEXITCODE -ne 0) { throw ".NET was installed but could not be started." }
+          & $dotnetExe --info
+          $dotnetExitCode = $LASTEXITCODE
+          if ($dotnetExitCode -ne 0) {
+            throw ".NET was installed but dotnet --info failed with exit code $dotnetExitCode."
+          }
 
       - name: Build and package
         shell: powershell
