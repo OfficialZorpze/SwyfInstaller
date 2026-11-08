@@ -228,11 +228,19 @@ void CheckStandardHooks(string message)
     if (freeze != null) Check(freeze.Body.Instructions[0].OpCode == Mono.Cecil.Cil.OpCodes.Ldarg_1 &&
         freeze.Body.Instructions[1].Operand is Mono.Cecil.MethodReference hook && hook.Name == "PrepareConversation" && hook.DeclaringType.FullName == "Swyf.CustomAI.Runtime",
         "current prompt preparation starts with the local-provider routing hook");
+    var entry = api.Methods.SingleOrDefault(m => m.Name == "get_CanStartGame");
+    var entryHook = entry?.Body.Instructions.Select((instruction, index) => (instruction, index))
+        .SingleOrDefault(x => x.instruction.Operand is Mono.Cecil.MethodReference hook &&
+            hook.DeclaringType.FullName == "Swyf.CustomAI.Runtime" && hook.Name == "UseCustomProviderForGameEntry");
+    Check(entry != null && entryHook.instruction != null && entryHook.index > 3 &&
+        entry.Body.Instructions.Take(entryHook.index).Any(i => i.Operand is Mono.Cecil.MethodReference steam &&
+            steam.DeclaringType.FullName == "Steamworks.SteamUser" && steam.Name == "BLoggedOn"),
+        "validated custom provider gate follows the Steam initialization and login checks");
     Check(api.Methods.Single(m => m.Name == "Awake").Body.Instructions.Count(i => i.Operand is Mono.Cecil.MethodReference m &&
         m.DeclaringType.FullName == "Swyf.CustomAI.Runtime" && m.Name == "EnsureInitialized") == 1 &&
         !assembly.MainModule.GetMemberReferences().Any(m => m.DeclaringType.FullName == "Swyf.CustomAI.Runtime" && m.Name is "ConfigureBackend" or "SkipAuth"), message);
 }
-CheckStandardHooks("new installation preserves backend authentication and initializes the custom provider");
+CheckStandardHooks("new installation keeps Steam checks and initializes the custom provider");
 // Recreate the withdrawn test layouts only in disposable copies and migrate from verified backups.
 foreach (var legacyVersion in new[] { 4, 5, 7 })
 {
@@ -295,10 +303,10 @@ foreach (var legacyVersion in new[] { 4, 5, 7 })
     File.WriteAllText(gameConfig, "disable_kolkata_api = true\n");
     Check(Installer.Main(["install", game, dist]) == 0 && Installer.Main(["verify", game]) == 0, $"version {legacyVersion} test installation migrates to current hooks");
     var migratedManifest = JsonNode.Parse(File.ReadAllText(legacyManifestPath))!;
-    Check(migratedManifest["Version"]!.GetValue<int>() == 8 && migratedManifest["LegacyMetadata"]?["mode"]?.GetValue<string>() == "preserved" &&
+    Check(migratedManifest["Version"]!.GetValue<int>() == 10 && migratedManifest["LegacyMetadata"]?["mode"]?.GetValue<string>() == "preserved" &&
         !File.Exists(gameConfig) && File.ReadAllText(privateSettings) == privateSettingsText,
         $"version {legacyVersion} migration removes obsolete config and preserves private settings and manifest metadata");
-    CheckStandardHooks($"version {legacyVersion} migration preserves backend authentication state");
+    CheckStandardHooks($"version {legacyVersion} migration preserves Steam checks and migrates the custom provider gate");
     GameEntryTests.Run(legacyAssemblyPath, Check);
 }
 File.WriteAllText(gameConfig, "obsolete test configuration");
