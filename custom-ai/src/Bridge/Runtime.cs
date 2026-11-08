@@ -277,7 +277,7 @@ namespace Swyf.CustomAI
                 request.SetRequestHeader("Content-Type", "application/json");
                 request.SetRequestHeader("X-CustomAI-Token", internalToken);
                 request.SetRequestHeader("X-CustomAI-Background", background ? "1" : "0");
-                request.timeout = 16;
+                request.timeout = 48;
                 var operation = request.SendWebRequest();
                 while (!operation.isDone)
                 {
