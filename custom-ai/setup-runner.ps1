@@ -65,7 +65,7 @@ else {
 
     Write-Host "Finding the latest official Windows x64 Actions runner..."
     $Release = Invoke-RestMethod -Uri "https://api.github.com/repos/actions/runner/releases/latest"
-    $Asset = $Release.assets | Where-Object { $_.name -match '^actions-runner-win-x64-.*\\.zip$' } | Select-Object -First 1
+    $Asset = $Release.assets | Where-Object { $_.name -like 'actions-runner-win-x64-*.zip' } | Select-Object -First 1
     if (-not $Asset) { throw "Could not find the Windows x64 runner ZIP in the latest runner release." }
 
     $ZipPath = Join-Path $env:TEMP $Asset.name
