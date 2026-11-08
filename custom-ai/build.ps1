@@ -3,9 +3,9 @@ $ErrorActionPreference = 'Stop'
 if ([string]::IsNullOrWhiteSpace($GameDir)) { throw 'Pass -GameDir or set SWYF_GAME_DIR to your game installation folder.' }
 Push-Location $PSScriptRoot
 try {
-    dotnet build src/Bridge/Bridge.csproj -c Release "-p:GameDir=$GameDir" --nologo
+    dotnet build src/Bridge/Bridge.csproj -c Release "-p:GameDir=$GameDir" "-p:RestoreSources=https://api.nuget.org/v3/index.json" --nologo
     if ($LASTEXITCODE) { throw 'Bridge build failed.' }
-    dotnet run --project tests/BridgeRouting/BridgeRouting.csproj -c Release "-p:GameDir=$GameDir"
+    dotnet run --project tests/BridgeRouting/BridgeRouting.csproj -c Release "-p:GameDir=$GameDir" "-p:RestoreSources=https://api.nuget.org/v3/index.json"
     if ($LASTEXITCODE) { throw 'Bridge request routing check failed.' }
     dotnet publish src/Panel/Panel.csproj -c Release -r win-x64 --self-contained false -o dist/panel --nologo
     if ($LASTEXITCODE) { throw 'Panel build failed.' }
