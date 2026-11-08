@@ -43,8 +43,15 @@ namespace Swyf.CustomAI
             catch { return true; }
         }
 
-        // This changes local game entry only; no game-service credentials or auth state are created.
-        public static bool UseCustomProviderForGameEntry() => ReadEnabled();
+        // The custom provider may satisfy the game's AI-backend entry gate only after its
+        // connection test/request has succeeded. Steam initialization and login remain game-owned.
+        public static bool UseCustomProviderForGameEntry()
+        {
+            var current = instance;
+            if (!ReadEnabled() || current == null || current.helper == null || current.helper.HasExited || current.url.Length == 0)
+                return false;
+            return (string?)current.connectionStatus?["state"] == "success";
+        }
 
         public static void EnsureInitialized()
         {
