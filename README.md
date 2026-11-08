@@ -232,3 +232,32 @@ or protocol changes may still require another update.
   tokens and the localhost port change when the panel restarts.
 - **Something failed in the app** — open Details → **Copy log** and include it
   when asking for help.
+
+## Build and publish a GitHub release
+
+The repository includes a GitHub Actions workflow at
+`.github/workflows/custom-ai-release.yml`. It builds the Windows ZIP and
+attaches it to a GitHub Release when you push a `custom-ai-v*` tag, or when
+you run the workflow manually from **Actions → Build and publish Custom AI**.
+
+The Bridge references Unity, Mirror, and other assemblies shipped with the
+game, so this job uses a Windows **self-hosted Actions runner** on a machine
+where the game is installed. GitHub-hosted runners do not have those game
+assemblies.
+
+1. In **Settings → Actions → Runners**, add a Windows x64 self-hosted runner
+   to this repository and give it the additional label `swyf-game`.
+2. On that runner machine, make sure .NET 10 SDK and the game's full-release
+   installation are available.
+3. In **Settings → Secrets and variables → Actions → Variables**, add
+   `SWYF_GAME_DIR` with the full path to the game install directory (the
+   folder containing `Scam With Your Friends_Data`).
+4. Push a version tag such as `custom-ai-v1.1.6`. The workflow builds,
+   runs the Bridge routing check, packages
+   `SWYF-Custom-AI-win-x64.zip`, and publishes it as a release asset.
+
+You can also use **Actions → Build and publish Custom AI → Run workflow**
+and enter a tag such as `custom-ai-v1.1.6`. The tag must use the
+`custom-ai-vMAJOR.MINOR.PATCH` format. The workflow needs repository
+**Contents: write** permission to publish releases; this is declared in the
+workflow file.
