@@ -30,7 +30,7 @@ jobs:
           dotnet-version: 10.0.x
 
       - name: Build and package
-        shell: pwsh
+        shell: powershell
         env:
           SWYF_GAME_DIR: ${{ vars.SWYF_GAME_DIR }}
         run: |
@@ -45,7 +45,7 @@ jobs:
 
       - name: Choose release tag
         id: release
-        shell: pwsh
+        shell: powershell
         env:
           INPUT_TAG: ${{ inputs.tag }}
           REF_TYPE: ${{ github.ref_type }}
