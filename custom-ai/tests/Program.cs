@@ -229,11 +229,11 @@ void CheckStandardHooks(string message)
         freeze.Body.Instructions[1].Operand is Mono.Cecil.MethodReference hook && hook.Name == "PrepareConversation" && hook.DeclaringType.FullName == "Swyf.CustomAI.Runtime",
         "current prompt preparation starts with the local-provider routing hook");
     var entry = api.Methods.SingleOrDefault(m => m.Name == "get_CanStartGame");
-    var entryHook = entry?.Body.Instructions.Select((instruction, index) => (instruction, index))
-        .SingleOrDefault(x => x.instruction.Operand is Mono.Cecil.MethodReference hook &&
-            hook.DeclaringType.FullName == "Swyf.CustomAI.Runtime" && hook.Name == "UseCustomProviderForGameEntry");
-    Check(entry != null && entryHook.instruction != null && entryHook.index > 3 &&
-        entry.Body.Instructions.Take(entryHook.index).Any(i => i.Operand is Mono.Cecil.MethodReference steam &&
+    var entryHookIndex = entry == null ? -1 : entry.Body.Instructions.ToList().FindIndex(i =>
+        i.Operand is Mono.Cecil.MethodReference hook && hook.DeclaringType.FullName == "Swyf.CustomAI.Runtime" &&
+        hook.Name == "UseCustomProviderForGameEntry");
+    Check(entry != null && entryHookIndex > 3 &&
+        entry.Body.Instructions.Take(entryHookIndex).Any(i => i.Operand is Mono.Cecil.MethodReference steam &&
             steam.DeclaringType.FullName == "Steamworks.SteamUser" && steam.Name == "BLoggedOn"),
         "validated custom provider gate follows the Steam initialization and login checks");
     Check(api.Methods.Single(m => m.Name == "Awake").Body.Instructions.Count(i => i.Operand is Mono.Cecil.MethodReference m &&
