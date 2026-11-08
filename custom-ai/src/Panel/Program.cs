@@ -169,7 +169,7 @@ public sealed class Provider : IDisposable
     public async Task<JsonObject> Complete(JsonObject original, Settings settings, bool isBackground, CancellationToken cancellation)
     {
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellation);
-        deadline.CancelAfter(TimeSpan.FromSeconds(15));
+        deadline.CancelAfter(TimeSpan.FromSeconds(45));
         var token = deadline.Token;
         bool hasAll = false, hasBackground = false;
         connectionStates[settings] = ("connecting", null);
@@ -181,18 +181,33 @@ public sealed class Provider : IDisposable
             bool IsInherited(string parameter) => parameter == "temperature" ? !settings.Temperature.HasValue : !settings.TopP.HasValue;
             foreach (var parameter in new[] { "temperature", "top_p" })
                 if (IsInherited(parameter) && unsupportedDefaults.ContainsKey((settings.BaseUrl, settings.Model, parameter))) body.Remove(parameter);
+            // Reuse one idempotency key across retries so transient network failures do not
+            // accidentally submit the same hosted completion as multiple billable requests.
+            var idempotencyKey = Guid.NewGuid().ToString("N");
             for (var attempt = 0; ; attempt++)
             {
             var payload = body.ToJsonString();
             if (Encoding.UTF8.GetByteCount(payload) > MaxRequest) throw new ApiFailure(413, "size", "The request is too large.");
             using var request = new HttpRequestMessage(HttpMethod.Post, settings.BaseUrl.TrimEnd('/') + "/chat/completions");
-            if (settings.BaseUrl == ManifestDeXClient.ServiceUrl + "/v1") {request.Headers.Add("X-CustomAI-Background", isBackground ? "1" : "0");request.Headers.Add("Idempotency-Key",Guid.NewGuid().ToString("N"));}
+            if (settings.BaseUrl == ManifestDeXClient.ServiceUrl + "/v1") {request.Headers.Add("X-CustomAI-Background", isBackground ? "1" : "0");request.Headers.Add("Idempotency-Key",idempotencyKey);}
             if (settings.ApiKey.Length > 0) request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", settings.ApiKey);
             request.Content = new StringContent(payload, Encoding.UTF8, "application/json");
             using var response = await http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, token);
             if (!response.IsSuccessStatusCode)
             {
                 int code = (int)response.StatusCode;
+                // Hosted inference can briefly return overload/gateway responses even for
+                // an active Pro member. Retry transient HTTP statuses, not auth/schema errors.
+                if (settings.BaseUrl == ManifestDeXClient.ServiceUrl + "/v1" &&
+                    attempt < 3 && (code == 408 || code == 425 || code == 429 || code >= 500))
+                {
+                    var retryAfter = response.Headers.RetryAfter?.Delta ??
+                        (response.Headers.RetryAfter?.Date - DateTimeOffset.UtcNow) ??
+                        TimeSpan.FromMilliseconds(500 * (1 << attempt));
+                    var delayMs = Math.Clamp(retryAfter.TotalMilliseconds, 250, 8000);
+                    await Task.Delay(TimeSpan.FromMilliseconds(delayMs), token);
+                    continue;
+                }
                 if(settings.BaseUrl==ManifestDeXClient.ServiceUrl+"/v1"){
                     var hostedBytes=await ReadBounded(await response.Content.ReadAsStreamAsync(token),32768,token);
                     string hostedMessage="ManifestDeX AI is temporarily unavailable.";
