@@ -7,9 +7,9 @@ try {
     if ($LASTEXITCODE) { throw 'Bridge build failed.' }
     dotnet run --project tests/BridgeRouting/BridgeRouting.csproj -c Release "-p:GameDir=$GameDir" "-p:RestoreSources=https://api.nuget.org/v3/index.json"
     if ($LASTEXITCODE) { throw 'Bridge request routing check failed.' }
-    dotnet publish src/Panel/Panel.csproj -c Release -r win-x64 --self-contained false -o dist/panel --nologo
+    dotnet publish src/Panel/Panel.csproj -c Release -r win-x64 --self-contained false "-p:RestoreSources=https://api.nuget.org/v3/index.json" -o dist/panel --nologo
     if ($LASTEXITCODE) { throw 'Panel build failed.' }
-    dotnet publish tools/Installer/Installer.csproj -c Release -r win-x64 --self-contained false -o dist/installer --nologo
+    dotnet publish tools/Installer/Installer.csproj -c Release -r win-x64 --self-contained false "-p:RestoreSources=https://api.nuget.org/v3/index.json" -o dist/installer --nologo
     if ($LASTEXITCODE) { throw 'Installer build failed.' }
     & ./tools/verify-bridge.ps1 -GameDir $GameDir
     New-Item -ItemType Directory -Force -Path dist/bridge | Out-Null
