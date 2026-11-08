@@ -215,6 +215,7 @@ public static class Program
             var entry = GameEntry.Getter(assembly);
             if (entry != null)
             {
+                ExpandBranches(entry);
                 var backendGate = GameEntry.BackendGate(entry);
                 var entryIl = entry.Body.GetILProcessor();
                 entryIl.InsertBefore(backendGate, entryIl.Create(OpCodes.Call, Import("UseCustomProviderForGameEntry")));
