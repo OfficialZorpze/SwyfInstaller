@@ -43,14 +43,20 @@ namespace Swyf.CustomAI
             catch { return true; }
         }
 
-        // The custom provider may satisfy the game's AI-backend entry gate only after its
-        // connection test/request has succeeded. Steam initialization and login remain game-owned.
+        // Pure readiness predicate so the bridge test can verify the gate without starting Unity.
+        // Steam initialization and login are checked separately by the game's original getter.
+        public static bool IsCustomProviderReady(bool enabled, bool helperAvailable, bool panelReady, string? state) =>
+            enabled && helperAvailable && panelReady && state == "success";
+
+        // The custom provider may satisfy only the game's AI-backend entry gate after validation.
         public static bool UseCustomProviderForGameEntry()
         {
             var current = instance;
-            if (!ReadEnabled() || current == null || current.helper == null || current.helper.HasExited || current.url.Length == 0)
-                return false;
-            return (string?)current.connectionStatus?["state"] == "success";
+            return IsCustomProviderReady(
+                ReadEnabled(),
+                current != null && current.helper != null && !current.helper.HasExited,
+                current != null && current.url.Length > 0,
+                (string?)current?.connectionStatus?["state"]);
         }
 
         public static void EnsureInitialized()
