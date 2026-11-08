@@ -27,13 +27,19 @@ internal static class Program
             Runtime.PrepareConversation(options);
             if(options.GameplayRoute!="official")throw new Exception("Disabled mod changed routing.");
             File.WriteAllText(config,"{\"enabled\":true}");
-            if(!Runtime.UseCustomProviderForGameEntry())throw new Exception("Custom provider still requires game AI sign-in.");
+            if(!Runtime.IsCustomProviderReady(true,true,true,"success"))throw new Exception("Validated custom provider did not satisfy the AI-backend gate.");
+            if(Runtime.IsCustomProviderReady(true,true,true,"untested") || Runtime.IsCustomProviderReady(true,true,true,"error"))
+                throw new Exception("Unvalidated or failed provider incorrectly satisfied the AI-backend gate.");
+            if(Runtime.IsCustomProviderReady(false,true,true,"success") || Runtime.IsCustomProviderReady(true,false,true,"success") ||
+                Runtime.IsCustomProviderReady(true,true,false,"success"))
+                throw new Exception("Disabled or unavailable custom provider incorrectly satisfied the AI-backend gate.");
             Runtime.PrepareConversation(options);
             if(options.GameplayRoute!="openrouter")throw new Exception("Custom provider did not use local prompts.");
+            Console.WriteLine("PASS: only an enabled, available, successfully validated custom provider satisfies the backend gate.");
             Console.WriteLine("PASS: custom provider selects local prompt preparation; disabled mod preserves original route.");
             File.Delete(config);
-            if(Runtime.UseCustomProviderForGameEntry())throw new Exception("Missing settings changed game entry.");
-            Console.WriteLine("PASS: game AI sign-in is optional only while custom AI is enabled.");
+            if(Runtime.IsCustomProviderReady(false,true,true,"success"))throw new Exception("Disabled mod changed game entry.");
+            Console.WriteLine("PASS: disabled or missing settings preserve the original game AI sign-in requirement.");
         }
         finally{if(prior==null)File.Delete(config);else File.WriteAllBytes(config,prior);}
     }
