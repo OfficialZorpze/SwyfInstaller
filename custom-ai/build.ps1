@@ -13,7 +13,7 @@ try {
     if ($LASTEXITCODE) { throw 'Installer build failed.' }
     & ./tools/verify-bridge.ps1 -GameDir $GameDir
     New-Item -ItemType Directory -Force -Path dist/bridge | Out-Null
-    Copy-Item -LiteralPath src/Bridge/bin/Release/net471/SWYF.CustomAI.Bridge.dll -Destination dist/bridge/SWYF.CustomAI.Bridge.dll
+    Copy-Item -LiteralPath src/Bridge/bin/Release/netstandard2.1/SWYF.CustomAI.Bridge.dll -Destination dist/bridge/SWYF.CustomAI.Bridge.dll
     Copy-Item -LiteralPath install.ps1,launch.ps1,../README.md -Destination dist
     Copy-Item -LiteralPath packaging/prerequisites.ps1 -Destination dist
     Write-Output 'Package ready: dist'
