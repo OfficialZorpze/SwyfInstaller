@@ -20,7 +20,7 @@ internal static class CompatibilityInstaller
     private static string StateDirectory(string gameDir)
     {
         string normalized = Path.GetFullPath(gameDir).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
-        string backupKey = normalized + "|Scam With Your Friends_Data\\Plugins\\x86_64\\steam_api64.dll";
+        string backupKey = normalized + "|Scam With Your Friends_Data\\\\Plugins\\\\x86_64\\\\steam_api64.dll";
         string key = Convert.ToHexString(SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(backupKey.ToUpperInvariant())));
         return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
             "SwyfInstaller", "compatibility-backups", key);
@@ -63,7 +63,7 @@ internal static class CompatibilityInstaller
 
     public static void Restore(string gameDir, Action<string> report)
     {
-        string target = Path.Combine(gameDir, "Plugins", "x86_64", "steam_api64.dll");
+        string target = Path.Combine(gameDir, "Scam With Your Friends_Data", "Plugins", "x86_64", "steam_api64.dll");
         string stateDir = StateDirectory(gameDir);
         string backup = Path.Combine(stateDir, "steam_api64.dll.original");
         string statePath = Path.Combine(stateDir, "state.json");
