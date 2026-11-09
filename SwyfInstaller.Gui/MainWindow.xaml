@@ -45,6 +45,8 @@
                 <TextBlock Text="{Binding GameFolderStatus}" FontSize="11" Foreground="#6b7280" Margin="0,0,0,12" TextWrapping="Wrap" />
 
                 <WrapPanel Orientation="Horizontal">
+                    <ui:Button Content="Verify Game Files" Command="{Binding VerifySteamGameFilesCommand}" Margin="0,0,8,8" Padding="16,6"
+                               ToolTip="Open Steam's file verification for App ID 4954910. Finish it before installing." />
                     <ui:Button Content="Install" Command="{Binding InstallCommand}" Appearance="Primary" Margin="0,0,8,8" Padding="20,6" />
                     <ui:Button Content="Start Game" Command="{Binding StartGameCommand}" Appearance="Primary" Margin="0,0,8,8" Padding="20,6" />
                     <ui:Button Content="Update" Command="{Binding UpdateModCommand}" Margin="0,0,8,8" Padding="20,6" />
