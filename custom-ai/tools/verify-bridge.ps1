@@ -1,6 +1,6 @@
 param(
     [string]$GameDir = $env:SWYF_GAME_DIR,
-    [string]$BridgePath = "$PSScriptRoot/../src/Bridge/bin/Release/net471/SWYF.CustomAI.Bridge.dll"
+    [string]$BridgePath = "$PSScriptRoot/../src/Bridge/bin/Release/netstandard2.1/SWYF.CustomAI.Bridge.dll"
 )
 $ErrorActionPreference = 'Stop'
 if ([string]::IsNullOrWhiteSpace($GameDir)) { throw 'Pass -GameDir or set SWYF_GAME_DIR to your game installation folder.' }
