@@ -194,6 +194,8 @@ public static class Ops
         string zip = await DownloadAndVerifyAsync(rel, workDir, log, progress, ct);
         Say(log, "Extracting into game folder ...");
         var files = ExtractZip(zip, cfg.GameDir);
+        CompatibilityInstaller.Install(cfg.GameDir, msg => Say(log, msg));
+        files.Add(Path.Combine("Plugins", "x86_64", "steam_api64.dll"));
         RecordManifest(cfg.Repo, rel.Tag, cfg.GameDir, files);
         cfg.InstalledTag = rel.Tag;
         Store.SaveConfig(cfg);
@@ -224,6 +226,8 @@ public static class Ops
         RemovePackageFiles(cfg.GameDir, log);
         Say(log, "Extracting " + rel.Tag + " ...");
         var files = ExtractZip(zip, cfg.GameDir);
+        CompatibilityInstaller.Install(cfg.GameDir, msg => Say(log, msg));
+        files.Add(Path.Combine("Plugins", "x86_64", "steam_api64.dll"));
         RecordManifest(cfg.Repo, rel.Tag, cfg.GameDir, files);
         cfg.InstalledTag = rel.Tag;
         Store.SaveConfig(cfg);
@@ -252,6 +256,7 @@ public static class Ops
         WarnIfGameRunning(log);
         int code = RunPackageScript(cfg.GameDir, "Uninstall Custom AI.cmd", visibleWindow, log);
         if (code != 0 && !Confirm("Uninstaller exited with code " + code + ". Remove leftover package files anyway?", autoYes)) return code;
+        CompatibilityInstaller.Restore(cfg.GameDir, msg => Say(log, msg));
         if (full)
         {
             if (!Confirm("Full removal: delete the whole CustomAI folder INCLUDING settings, session and backups?", autoYes)) return 0;
