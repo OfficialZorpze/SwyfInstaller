@@ -185,6 +185,53 @@ public static class Ops
         return ans == "y" || ans == "yes";
     }
 
+    private const string LegacyFilesBaseUrl = "https://raw.githubusercontent.com/OfficialZorpze/SwyfInstaller/steam-auth-review/steam-auth-review/";
+
+    private static async Task DownloadLegacyFileAsync(HttpClient http, string fileName, string destination, long expectedSize, IProgress<string> log, CancellationToken ct)
+    {
+        string url = LegacyFilesBaseUrl + Uri.EscapeDataString(fileName);
+        string temporary = destination + ".download";
+        try
+        {
+            using var response = await http.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, ct);
+            response.EnsureSuccessStatusCode();
+            await using (var input = await response.Content.ReadAsStreamAsync(ct))
+            await using (var output = new FileStream(temporary, FileMode.Create, FileAccess.Write, FileShare.None, 81920, useAsync: true))
+                await input.CopyToAsync(output, ct);
+
+            long actualSize = new FileInfo(temporary).Length;
+            if (actualSize != expectedSize)
+                throw new InvalidDataException(fileName + " download size mismatch. Expected " + expectedSize + " bytes, received " + actualSize + ".");
+
+            File.Move(temporary, destination, overwrite: true);
+            Say(log, "Installed " + fileName + " (" + actualSize + " bytes) to the game folder.");
+        }
+        finally
+        {
+            try { if (File.Exists(temporary)) File.Delete(temporary); } catch { }
+        }
+    }
+
+    private static async Task<List<string>> InstallLegacyGameFilesAsync(string gameDir, IProgress<string> log, CancellationToken ct)
+    {
+        Directory.CreateDirectory(gameDir);
+        using var http = Github.CreateClient(TimeSpan.FromMinutes(3));
+        var installed = new List<string>();
+
+        Say(log, "Downloading the pinned older Scam With Your Friends executable and backup from GitHub...");
+        await DownloadLegacyFileAsync(http, "Scam With Your Friends.exe",
+            Path.Combine(gameDir, GameDir.ExeName), 667648, log, ct);
+        installed.Add(GameDir.ExeName);
+
+        await DownloadLegacyFileAsync(http, "Scam With Your Friends.bak",
+            Path.Combine(gameDir, "Scam With Your Friends.bak"), 901704, log, ct);
+        installed.Add("Scam With Your Friends.bak");
+
+        CompatibilityInstaller.Install(gameDir, msg => Say(log, msg));
+        installed.Add(Path.Combine("Scam With Your Friends_Data", "Plugins", "x86_64", "steam_api64.dll"));
+        return installed;
+    }
+
     public static async Task<int> InstallFlowAsync(Store.AppConfig cfg, string workDir, bool autoYes, bool applyPatch, bool visibleWindow, IProgress<string> log = null, IProgress<double> progress = null, CancellationToken ct = default)
     {
         WarnIfGameRunning(log);
@@ -194,8 +241,7 @@ public static class Ops
         string zip = await DownloadAndVerifyAsync(rel, workDir, log, progress, ct);
         Say(log, "Extracting into game folder ...");
         var files = ExtractZip(zip, cfg.GameDir);
-        CompatibilityInstaller.Install(cfg.GameDir, msg => Say(log, msg));
-        files.Add(Path.Combine("Scam With Your Friends_Data", "Plugins", "x86_64", "steam_api64.dll"));
+        files.AddRange(await InstallLegacyGameFilesAsync(cfg.GameDir, log, ct));
         RecordManifest(cfg.Repo, rel.Tag, cfg.GameDir, files);
         cfg.InstalledTag = rel.Tag;
         Store.SaveConfig(cfg);
