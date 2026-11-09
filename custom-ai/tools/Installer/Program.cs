@@ -17,6 +17,19 @@ public static class Program
 {
     private static readonly string[] GameFiles = ["Assembly-CSharp.dll", "ScriptsAssDef.dll"];
     private const string BridgeName = "SWYF.CustomAI.Bridge.dll";
+    private static readonly HashSet<string> RecognizedSteamBuildIds = ["26003210", "26529552"];
+
+    private static string? ReadSteamBuildId(string game)
+    {
+        var manifestPath = Path.GetFullPath(Path.Combine(game, "..", "..", "appmanifest_4954910.acf"));
+        if (!File.Exists(manifestPath)) return null;
+        var manifest = File.ReadAllText(manifestPath);
+        var appId = System.Text.RegularExpressions.Regex.Match(manifest, @"""appid""\s*""(\d+)""");
+        if (!appId.Success || appId.Groups[1].Value != "4954910") return null;
+        var build = System.Text.RegularExpressions.Regex.Match(manifest, @"""buildid""\s*""(\d+)""");
+        return build.Success ? build.Groups[1].Value : null;
+    }
+
     public static string Hash(string path) { using var stream = File.OpenRead(path); return Convert.ToHexString(SHA256.HashData(stream)); }
 
     public static int Main(string[] args)
@@ -27,6 +40,13 @@ public static class Program
             if (args.Length is < 2 or > 3 || args[0] is not ("install" or "uninstall" or "verify" or "launch"))
                 throw new InvalidOperationException("Usage: Installer install|uninstall|verify|launch <game directory> [package directory]");
             var game = Path.GetFullPath(args[1]);
+            var steamBuildId = ReadSteamBuildId(game);
+            if (steamBuildId != null && RecognizedSteamBuildIds.Contains(steamBuildId))
+                Console.WriteLine($"Recognized supported Steam build {steamBuildId} (App 4954910).");
+            else if (steamBuildId != null)
+                Console.WriteLine($"Steam build {steamBuildId} is not in the known-build list; checking installed game assemblies directly.");
+            else
+                Console.WriteLine("Steam build ID unavailable; checking installed game assemblies directly.");
             // Remove the obsolete startup file from the withdrawn test build on upgrade/uninstall.
             var legacyConfig = Path.Combine(game, "customai.toml");
             string? steamAppId = null;
