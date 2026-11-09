@@ -63,5 +63,5 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          $tag = "installer-v1.1.8"
-          gh release create $tag --target $env:GITHUB_SHA SwyfInstaller-GUI-win-x64.zip --repo $env:GITHUB_REPOSITORY --title "SWYF Installer GUI v1.1.8" --notes "Standalone Windows x64 GUI installer. Includes the tested low-end CPU compatibility DLL and the Custom AI installer workflow."
+          $tag = "installer-v1.1.9"
+          gh release create $tag --target $env:GITHUB_SHA SwyfInstaller-GUI-win-x64.zip --repo $env:GITHUB_REPOSITORY --title "SWYF Installer GUI v1.1.9" --notes "Standalone Windows x64 GUI installer. Adds Steam file verification, pinned legacy game files, and size-checked compatibility DLL installation."
