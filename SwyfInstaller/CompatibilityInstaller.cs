@@ -28,11 +28,19 @@ internal static class CompatibilityInstaller
 
     public static void Install(string gameDir, Action<string> report)
     {
+        string target = Path.Combine(gameDir, "Scam With Your Friends_Data", "Plugins", "x86_64", "steam_api64.dll");
+
+        // Keep an existing game DLL exactly as it is. The Custom AI package install
+        // continues in Ops after this method returns.
+        if (File.Exists(target))
+        {
+            report("Steam API DLL already exists at Scam With Your Friends_Data\\Plugins\\x86_64\\steam_api64.dll; leaving it unchanged and continuing.");
+            return;
+        }
+
         string source = Path.Combine(AppContext.BaseDirectory, "compatibility", "Plugins", "x86_64", "steam_api64.dll");
         if (!File.Exists(source))
             throw new FileNotFoundException("The bundled low-end CPU compatibility DLL is missing.", source);
-
-        string target = Path.Combine(gameDir, "Scam With Your Friends_Data", "Plugins", "x86_64", "steam_api64.dll");
         string stateDir = StateDirectory(gameDir);
         string backup = Path.Combine(stateDir, "steam_api64.dll.original");
         string statePath = Path.Combine(stateDir, "state.json");
