@@ -238,6 +238,30 @@ public partial class MainViewModel : ObservableObject
     }
 
     [RelayCommand]
+    private void StartGame()
+    {
+        if (!RequireGameFolder("Start game")) return;
+        try
+        {
+            string exe = Path.Combine(GameDir.Trim(), SwyfInstaller.GameDir.ExeName);
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = exe,
+                WorkingDirectory = GameDir.Trim(),
+                UseShellExecute = true
+            });
+            StatusMessage = "Launching Scam With Your Friends…";
+            AppendLog("Started game: " + exe);
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = "Could not start the game: " + ex.Message;
+            AppendLog("Start game failed: " + ex);
+            MessageBox.Show(ex.Message, "Could not start game", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
+    [RelayCommand]
     private void CopyLog()
     {
         try
