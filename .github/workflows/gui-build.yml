@@ -63,5 +63,5 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          $tag = "installer-v1.1.9"
-          gh release create $tag --target $env:GITHUB_SHA SwyfInstaller-GUI-win-x64.zip --repo $env:GITHUB_REPOSITORY --title "SWYF Installer GUI v1.1.9" --notes "Standalone Windows x64 GUI installer. Adds Steam file verification, pinned legacy game files, and size-checked compatibility DLL installation."
+          $tag = "installer-v1.2.0"
+          gh release create $tag --target $env:GITHUB_SHA SwyfInstaller-GUI-win-x64.zip --repo $env:GITHUB_REPOSITORY --title "SWYF Installer GUI v1.2.0" --notes "Standalone Windows x64 GUI installer. Uses the OfficialZorpze release feed and verifies the compatibility DLL by size and SHA-256 before replacing it."
