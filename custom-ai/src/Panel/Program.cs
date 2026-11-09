@@ -18,11 +18,12 @@ public sealed record Settings(bool Enabled = false, string BaseUrl = "", string 
     double? Temperature = null, double? TopP = null, int? MaxTokens = null, string OutputMode = "schema", bool UseManifestDeX = false);
 public sealed record SettingsInput(bool Enabled, string BaseUrl, string Model, string? ApiKey = null,
     bool ClearApiKey = false, double? Temperature = null, double? TopP = null, int? MaxTokens = null, string OutputMode = "schema", bool UseManifestDeX = false);
-public sealed class ApiFailure(int status, string code, string message, int? retryAfter = null) : Exception(message)
+public sealed class ApiFailure(int status, string code, string message, int? retryAfter = null, string? details = null) : Exception(message)
 {
     public int Status { get; } = status;
     public string Code { get; } = code;
     public int? RetryAfter { get; } = retryAfter;
+    public string? Details { get; } = details;
 }
 
 public sealed class SettingsStore(string path)
@@ -196,6 +197,15 @@ public sealed class Provider : IDisposable
             if (!response.IsSuccessStatusCode)
             {
                 int code = (int)response.StatusCode;
+                var errorBytes = await ReadBounded(await response.Content.ReadAsStreamAsync(token), 32768, token);
+                var errorBody = Encoding.UTF8.GetString(errorBytes);
+                var diagnosticHeaders = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+                foreach (var name in new[] { "x-request-id", "request-id", "cf-ray", "server", "retry-after", "x-ratelimit-limit", "x-ratelimit-remaining", "x-ratelimit-reset" })
+                {
+                    if (response.Headers.TryGetValues(name, out var values)) diagnosticHeaders[name] = string.Join(", ", values).Take(512).Aggregate(new StringBuilder(), (b, ch) => b.Append(ch)).ToString();
+                    else if (response.Content.Headers.TryGetValues(name, out values)) diagnosticHeaders[name] = string.Join(", ", values);
+                }
+                var diagnostic = JsonSerializer.Serialize(new { httpStatus = code, headers = diagnosticHeaders, body = errorBody.Length > 16000 ? errorBody[..16000] + " [truncated]" : errorBody });
                 // Hosted inference can briefly return overload/gateway responses even for
                 // an active Pro member. Retry transient HTTP statuses, not auth/schema errors.
                 if (settings.BaseUrl == ManifestDeXClient.ServiceUrl + "/v1" &&
@@ -209,15 +219,13 @@ public sealed class Provider : IDisposable
                     continue;
                 }
                 if(settings.BaseUrl==ManifestDeXClient.ServiceUrl+"/v1"){
-                    var hostedBytes=await ReadBounded(await response.Content.ReadAsStreamAsync(token),32768,token);
                     string hostedMessage="ManifestDeX AI is temporarily unavailable.";
-                    try{hostedMessage=JsonNode.Parse(hostedBytes)?["message"]?.GetValue<string>()??hostedMessage;}catch(JsonException){}
-                    throw new ApiFailure(code,"manifestdex",hostedMessage);
+                    try{hostedMessage=JsonNode.Parse(errorBytes)?["message"]?.GetValue<string>()??hostedMessage;}catch(JsonException){}
+                    throw new ApiFailure(code,"manifestdex",hostedMessage,details:diagnostic);
                 }
                 if (code == 400 && attempt < 2)
                 {
                     // Only react to an explicit unsupported-parameter error, never an arbitrary provider failure.
-                    var errorBytes = await ReadBounded(await response.Content.ReadAsStreamAsync(token), MaxResponse, token);
                     string? message = null;
                     try { message = JsonNode.Parse(errorBytes)?["error"]?["message"]?.GetValue<string>(); } catch (JsonException) { }
                     var match = Regex.Match(message ?? "", "Unsupported parameter:\\s*['\"](?<parameter>temperature|top_p)['\"]", RegexOptions.IgnoreCase);
@@ -232,11 +240,12 @@ public sealed class Provider : IDisposable
                 }
                 throw code switch
                 {
-                    401 or 403 => new ApiFailure(502, "auth", "The provider denied access. Check your API key and permissions."),
-                    404 => new ApiFailure(502, "model_or_endpoint", "Model or API endpoint not found. Check the Base URL and model ID."),
-                    400 or 422 => new ApiFailure(502, "model_parameters", "The provider rejected the model, output format, or generation settings."),
-                    429 => new ApiFailure(502, "rate_limit", "The provider quota or rate limit was reached."),
-                    _ => new ApiFailure(502, "provider_http", $"The provider returned HTTP {code}.")
+                    401 or 403 => new ApiFailure(502, "auth", "The provider denied access. Check your API key and permissions.", details:diagnostic),
+                    404 => new ApiFailure(502, "model_or_endpoint", "Model or API endpoint not found. Check the Base URL and model ID.", details:diagnostic),
+                    400 or 422 => new ApiFailure(502, "model_parameters", "The provider rejected the model, output format, or generation settings.", details:diagnostic),
+                    402 => new ApiFailure(502, "provider_payment", "The provider returned HTTP 402. See the provider response details below.", details:diagnostic),
+                    429 => new ApiFailure(502, "rate_limit", "The provider quota or rate limit was reached.", details:diagnostic),
+                    _ => new ApiFailure(502, "provider_http", $"The provider returned HTTP {code}.", details:diagnostic)
                 };
             }
             var bytes = await ReadBounded(await response.Content.ReadAsStreamAsync(token), MaxResponse, token);
@@ -307,7 +316,7 @@ public static class Program
                 { ctx.Response.StatusCode = 401; return; }
             }
             try { await next(); }
-            catch (ApiFailure e) { ctx.Response.StatusCode = e.Status; if(e.RetryAfter is int retry)ctx.Response.Headers.RetryAfter=retry.ToString(); await ctx.Response.WriteAsJsonAsync(new { error = e.Code, message = e.Message, retryAfter=e.RetryAfter }); }
+            catch (ApiFailure e) { ctx.Response.StatusCode = e.Status; if(e.RetryAfter is int retry)ctx.Response.Headers.RetryAfter=retry.ToString(); await ctx.Response.WriteAsJsonAsync(new { error = e.Code, message = e.Message, retryAfter=e.RetryAfter, details=e.Details }); }
             catch (OperationCanceledException) when (ctx.RequestAborted.IsCancellationRequested) { }
             catch (Exception e) when (e is JsonException or BadHttpRequestException)
             { ctx.Response.StatusCode = 400; await ctx.Response.WriteAsJsonAsync(new { error = "json", message = "Invalid JSON request." }); }
