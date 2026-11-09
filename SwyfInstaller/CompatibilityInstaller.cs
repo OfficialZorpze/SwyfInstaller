@@ -20,7 +20,8 @@ internal static class CompatibilityInstaller
     private static string StateDirectory(string gameDir)
     {
         string normalized = Path.GetFullPath(gameDir).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
-        string key = Convert.ToHexString(SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(normalized.ToUpperInvariant())));
+        string backupKey = normalized + "|Scam With Your Friends_Data\\Plugins\\x86_64\\steam_api64.dll";
+        string key = Convert.ToHexString(SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(backupKey.ToUpperInvariant())));
         return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
             "SwyfInstaller", "compatibility-backups", key);
     }
@@ -31,7 +32,7 @@ internal static class CompatibilityInstaller
         if (!File.Exists(source))
             throw new FileNotFoundException("The bundled low-end CPU compatibility DLL is missing.", source);
 
-        string target = Path.Combine(gameDir, "Plugins", "x86_64", "steam_api64.dll");
+        string target = Path.Combine(gameDir, "Scam With Your Friends_Data", "Plugins", "x86_64", "steam_api64.dll");
         string stateDir = StateDirectory(gameDir);
         string backup = Path.Combine(stateDir, "steam_api64.dll.original");
         string statePath = Path.Combine(stateDir, "state.json");
@@ -56,7 +57,7 @@ internal static class CompatibilityInstaller
         File.Copy(source, target, overwrite: true);
         state.InstalledSha256 = sourceHash;
         File.WriteAllText(statePath, JsonSerializer.Serialize(state, new JsonSerializerOptions { WriteIndented = true }));
-        report("Installed low-end CPU compatibility DLL to Plugins\\x86_64\\steam_api64.dll.");
+        report("Installed low-end CPU compatibility DLL to Scam With Your Friends_Data\\Plugins\\x86_64\\steam_api64.dll.");
         report("Original DLL backup: " + (state.HadOriginal ? backup : "(no original DLL was present)"));
     }
 
