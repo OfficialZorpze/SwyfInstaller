@@ -170,7 +170,7 @@ public sealed class Provider : IDisposable
     public async Task<JsonObject> Complete(JsonObject original, Settings settings, bool isBackground, CancellationToken cancellation)
     {
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellation);
-        deadline.CancelAfter(TimeSpan.FromSeconds(45));
+        deadline.CancelAfter(TimeSpan.FromSeconds(90));
         var token = deadline.Token;
         bool hasAll = false, hasBackground = false;
         connectionStates[settings] = ("connecting", null);
@@ -271,7 +271,7 @@ public sealed class Provider : IDisposable
             }
         }
         catch (OperationCanceledException) when (!cancellation.IsCancellationRequested)
-        { LastError = "The provider did not respond within 15 seconds."; connectionStates[settings] = ("error", LastError); throw new ApiFailure(504, "timeout", LastError); }
+        { LastError = "The provider did not respond within 90 seconds."; connectionStates[settings] = ("error", LastError); throw new ApiFailure(504, "timeout", LastError); }
         catch (OperationCanceledException)
         { connectionStates[settings] = ("error", "The request was canceled or the game response deadline expired."); throw; }
         catch (HttpRequestException)
