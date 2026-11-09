@@ -187,12 +187,42 @@ public partial class MainViewModel : ObservableObject
     }
 
     [RelayCommand]
+    private void VerifySteamGameFiles()
+    {
+        if (IsBusy) return;
+        if (!RequireGameFolder("Steam file verification")) return;
+        if (SwyfInstaller.GameDir.IsGameRunning())
+        {
+            MessageBox.Show("Close Scam With Your Friends before verifying its files in Steam.", "Game is running",
+                MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
+        try
+        {
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("steam://validate/4954910")
+            {
+                UseShellExecute = true
+            });
+            StatusMessage = "Steam verification opened. Wait for Steam to finish before clicking Install.";
+            AppendLog("Opened Steam file verification for App ID 4954910. Finish the verification and any queued download before installing.");
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = "Could not open Steam verification: " + ex.Message;
+            AppendLog("Steam verification failed to open: " + ex);
+            MessageBox.Show("Could not open Steam's file verification. Make sure Steam is installed and running.\n\n" + ex.Message,
+                "Steam verification", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
+    [RelayCommand]
     private async Task InstallAsync()
     {
         if (IsBusy) return;
         if (!RequireGameFolder("Install")) return;
-        if (MessageBox.Show("Download the latest mod and set it up in your game folder?\n\nYour provider settings and backups are kept if you reinstall later.",
-                "Install latest mod",
+        if (MessageBox.Show("Have you completed Steam's Verify integrity of game files process for Scam With Your Friends (App ID 4954910), including any downloads?\n\nThe installer will then put the pinned older game executable and .bak file in the game folder, install or replace steam_api64.dll if its size differs from the GitHub copy, and install Custom AI.\n\nDo not continue while Steam is still verifying or downloading.",
+                "Confirm Steam verification is complete",
                 MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes) return;
         await RunOpAsync((log, bar, ct) =>
             SwyfInstaller.Ops.InstallFlowAsync(LoadBackendConfig(), WorkDir(), autoYes: true, applyPatch: true, visibleWindow: true, log, bar, ct),
