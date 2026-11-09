@@ -182,11 +182,11 @@ public sealed class Provider : IDisposable
             bool IsInherited(string parameter) => parameter == "temperature" ? !settings.Temperature.HasValue : !settings.TopP.HasValue;
             foreach (var parameter in new[] { "temperature", "top_p" })
                 if (IsInherited(parameter) && unsupportedDefaults.ContainsKey((settings.BaseUrl, settings.Model, parameter))) body.Remove(parameter);
+            // Keep one idempotency key for the entire logical completion. Retries must
+            // be recognized by ManifestDeX as the same request, not new generations.
+            var idempotencyKey = Guid.NewGuid().ToString("N");
             for (var attempt = 0; ; attempt++)
             {
-            // Each HTTP attempt gets its own key. ManifestDeX may mark an attempt finished
-            // even when its response is lost; reusing that key then produces HTTP 409.
-            var idempotencyKey = Guid.NewGuid().ToString("N");
             var payload = body.ToJsonString();
             if (Encoding.UTF8.GetByteCount(payload) > MaxRequest) throw new ApiFailure(413, "size", "The request is too large.");
             using var request = new HttpRequestMessage(HttpMethod.Post, settings.BaseUrl.TrimEnd('/') + "/chat/completions");
@@ -206,19 +206,6 @@ public sealed class Provider : IDisposable
                     else if (response.Content.Headers.TryGetValues(name, out values)) diagnosticHeaders[name] = string.Join(", ", values);
                 }
                 var diagnostic = JsonSerializer.Serialize(new { httpStatus = code, headers = diagnosticHeaders, body = errorBody.Length > 16000 ? errorBody[..16000] + " [truncated]" : errorBody });
-                // A completed idempotency key cannot be replayed by ManifestDeX.
-                // Retry this specific conflict with the fresh key generated for this attempt.
-                bool idempotencyConflict = false;
-                if (settings.BaseUrl == ManifestDeXClient.ServiceUrl + "/v1" && code == 409)
-                {
-                    try { idempotencyConflict = JsonNode.Parse(errorBytes)?["error"]?.GetValue<string>() == "idempotency"; }
-                    catch (JsonException) { }
-                }
-                if (idempotencyConflict && attempt < 2)
-                {
-                    await Task.Delay(TimeSpan.FromMilliseconds(250 * (attempt + 1)), token);
-                    continue;
-                }
                 // Hosted inference can briefly return overload/gateway responses even for
                 // an active Pro member. Retry transient HTTP statuses, not auth/schema errors.
                 if (settings.BaseUrl == ManifestDeXClient.ServiceUrl + "/v1" &&
