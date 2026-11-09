@@ -6,13 +6,14 @@ on:
       - steam-auth-review
     paths:
       - 'SwyfInstaller/**'
+      - 'compatibility/**'
       - 'SwyfInstaller.Gui/**'
       - 'SwyfInstaller.sln'
       - '.github/workflows/gui-build.yml'
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build:
@@ -52,3 +53,11 @@ jobs:
           path: SwyfInstaller-GUI-win-x64.zip
           if-no-files-found: error
           retention-days: 14
+
+      - name: Publish GitHub Release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $tag = "installer-v1.1.6"
+          gh release create $tag --target $env:GITHUB_SHA SwyfInstaller-GUI-win-x64.zip --repo $env:GITHUB_REPOSITORY --title "SWYF Installer GUI v1.1.6" --notes "Standalone Windows x64 GUI installer. Includes the tested low-end CPU compatibility DLL and the Custom AI installer workflow."
