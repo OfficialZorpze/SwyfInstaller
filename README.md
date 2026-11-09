@@ -1,3 +1,6 @@
+# NOTE: This is a fork of the original all credit to the creator, and AI for fixing the underlying issues. Credits to me for discovering the latest patch. 
+# NOTE: You will have to verify via the localhost website before the play button is accessable.
+
 # SWYF Custom AI — Installer + Mod
 
 Use your own OpenAI-compatible AI provider in **Scam With Your Friends**.
