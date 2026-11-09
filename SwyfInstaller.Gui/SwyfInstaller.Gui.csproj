@@ -7,7 +7,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>
     <AssemblyName>SwyfInstallerGui</AssemblyName>
-    <Version>1.1.5</Version>
+    <Version>1.1.6</Version>
     <Description>Basic UI for the SWYF Custom AI installer.</Description>
   </PropertyGroup>
 
@@ -18,6 +18,14 @@
 
   <ItemGroup>
     <ProjectReference Include="..\SwyfInstaller\SwyfInstaller.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="..\compatibility\Plugins\x86_64\steam_api64.dll">
+      <Link>compatibility\Plugins\x86_64\steam_api64.dll</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
   </ItemGroup>
 
 </Project>
