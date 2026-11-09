@@ -12,6 +12,10 @@ on:
       - '.github/workflows/gui-build.yml'
   workflow_dispatch:
 
+concurrency:
+  group: swyf-gui-build-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: write
 
