@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - "steam-auth-review"
+    paths:
+      - "custom-ai/**"
+      - ".github/workflows/custom-ai-release.yml"
     tags:
       - "custom-ai-v*"
   workflow_dispatch:
