@@ -1,0 +1,54 @@
+name: Build SWYF Installer GUI
+
+on:
+  push:
+    branches:
+      - steam-auth-review
+    paths:
+      - 'SwyfInstaller/**'
+      - 'SwyfInstaller.Gui/**'
+      - 'SwyfInstaller.sln'
+      - '.github/workflows/gui-build.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Restore
+        run: dotnet restore SwyfInstaller.sln
+
+      - name: Build solution
+        run: dotnet build SwyfInstaller.sln --configuration Release --no-restore
+
+      - name: Publish standalone GUI
+        run: dotnet publish SwyfInstaller.Gui/SwyfInstaller.Gui.csproj --configuration Release --runtime win-x64 --self-contained true --output artifacts/gui -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true
+
+      - name: Include CLI companion
+        shell: pwsh
+        run: |
+          dotnet publish SwyfInstaller/SwyfInstaller.csproj --configuration Release --runtime win-x64 --self-contained true --output artifacts/gui/cli -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true
+
+      - name: Package build
+        shell: pwsh
+        run: |
+          Compress-Archive -Path artifacts/gui/* -DestinationPath SwyfInstaller-GUI-win-x64.zip -Force
+
+      - name: Upload GUI build
+        uses: actions/upload-artifact@v4
+        with:
+          name: SwyfInstaller-GUI-win-x64
+          path: SwyfInstaller-GUI-win-x64.zip
+          if-no-files-found: error
+          retention-days: 14
