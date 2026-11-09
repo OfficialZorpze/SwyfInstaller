@@ -44,7 +44,7 @@ jobs:
             throw ".NET was installed but dotnet --info failed with exit code $dotnetExitCode."
           }
 
-      - name: Build and package
+      - name: Diagnose Bridge references and build
         shell: powershell
         env:
           SWYF_GAME_DIR: ${{ vars.SWYF_GAME_DIR }}
@@ -52,6 +52,43 @@ jobs:
           if ([string]::IsNullOrWhiteSpace($env:SWYF_GAME_DIR)) {
             throw "Set the SWYF_GAME_DIR repository variable to the game install directory on this self-hosted runner."
           }
+
+          $managed = Join-Path $env:SWYF_GAME_DIR "Scam With Your Friends_Data\Managed"
+          $diagLog = Join-Path $env:RUNNER_TEMP "bridge-ci-diag.log"
+
+          Write-Host "=== Bridge build diagnostics ==="
+          Write-Host "Commit: $(git rev-parse HEAD)"
+          Write-Host "Game directory: $env:SWYF_GAME_DIR"
+          Write-Host "Managed directory: $managed"
+          Write-Host "DOTNET_ROOT: $env:DOTNET_ROOT"
+          dotnet --info
+
+          foreach ($file in @("UniTask.dll", "netstandard.dll", "UnityEngine.CoreModule.dll")) {
+            $path = Join-Path $managed $file
+            if (Test-Path $path) {
+              Get-Item $path | Select-Object FullName, Length, LastWriteTime
+              Get-FileHash $path -Algorithm SHA256
+            } else {
+              Write-Host "Not found in Managed root: $path"
+            }
+          }
+
+          Write-Host "=== Resolved MSBuild properties ==="
+          dotnet msbuild ./custom-ai/src/Bridge/Bridge.csproj -getProperty:TargetFramework,TargetFrameworkRootPath,NetStandardImplicitPackageVersion,MSBuildSDKsPath,NETCoreSdkVersion "-p:GameDir=$env:SWYF_GAME_DIR"
+
+          Write-Host "=== Diagnostic Bridge compilation ==="
+          dotnet build ./custom-ai/src/Bridge/Bridge.csproj -c Release "-p:GameDir=$env:SWYF_GAME_DIR" "-p:RestoreSources=https://api.nuget.org/v3/index.json" -v:diag --nologo *> $diagLog
+          $bridgeExitCode = $LASTEXITCODE
+
+          if ($bridgeExitCode -ne 0) {
+            Write-Host "=== Relevant compiler/reference resolution lines ==="
+            Select-String -Path $diagLog -Pattern "netstandard.dll|UniTask.dll|TargetFramework =|TargetFrameworkRootPath|ReferencePath|ResolveAssemblyReference" |
+              Select-Object -First 100
+            throw "Diagnostic Bridge compilation failed with exit code $bridgeExitCode. Full log: $diagLog"
+          }
+
+          Write-Host "Diagnostic Bridge compilation succeeded."
+
           ./custom-ai/build.ps1 -GameDir $env:SWYF_GAME_DIR
           if ($LASTEXITCODE -ne 0) { throw "Build/package failed." }
           if (-not (Test-Path "./custom-ai/artifacts/SWYF-Custom-AI-win-x64.zip")) {
