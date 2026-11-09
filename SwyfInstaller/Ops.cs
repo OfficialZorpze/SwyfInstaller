@@ -195,7 +195,7 @@ public static class Ops
         Say(log, "Extracting into game folder ...");
         var files = ExtractZip(zip, cfg.GameDir);
         CompatibilityInstaller.Install(cfg.GameDir, msg => Say(log, msg));
-        files.Add(Path.Combine("Plugins", "x86_64", "steam_api64.dll"));
+        files.Add(Path.Combine("Scam With Your Friends_Data", "Plugins", "x86_64", "steam_api64.dll"));
         RecordManifest(cfg.Repo, rel.Tag, cfg.GameDir, files);
         cfg.InstalledTag = rel.Tag;
         Store.SaveConfig(cfg);
@@ -227,7 +227,7 @@ public static class Ops
         Say(log, "Extracting " + rel.Tag + " ...");
         var files = ExtractZip(zip, cfg.GameDir);
         CompatibilityInstaller.Install(cfg.GameDir, msg => Say(log, msg));
-        files.Add(Path.Combine("Plugins", "x86_64", "steam_api64.dll"));
+        files.Add(Path.Combine("Scam With Your Friends_Data", "Plugins", "x86_64", "steam_api64.dll"));
         RecordManifest(cfg.Repo, rel.Tag, cfg.GameDir, files);
         cfg.InstalledTag = rel.Tag;
         Store.SaveConfig(cfg);
