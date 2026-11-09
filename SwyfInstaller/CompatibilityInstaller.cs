@@ -35,10 +35,19 @@ internal static class CompatibilityInstaller
 
         Directory.CreateDirectory(Path.GetDirectoryName(target)!);
         long expectedSize = new FileInfo(source).Length;
-        if (File.Exists(target) && new FileInfo(target).Length == expectedSize)
+        string sourceHash = HashFile(source);
+        if (File.Exists(target))
         {
-            report("Steam API DLL size matches the GitHub compatibility copy (" + expectedSize + " bytes); leaving it unchanged.");
-            return;
+            long installedSize = new FileInfo(target).Length;
+            string installedHash = HashFile(target);
+            if (installedSize == expectedSize &&
+                string.Equals(installedHash, sourceHash, StringComparison.OrdinalIgnoreCase))
+            {
+                report("Steam API DLL matches the GitHub compatibility copy (size and SHA-256); leaving it unchanged.");
+                return;
+            }
+            report("Steam API DLL differs from the GitHub compatibility copy (" +
+                installedSize + " bytes installed, " + expectedSize + " bytes expected; SHA-256 comparison included); replacing it.");
         }
 
         string stateDir = StateDirectory(gameDir);
@@ -60,7 +69,6 @@ internal static class CompatibilityInstaller
             state = new InstallState { HadOriginal = hadOriginal };
         }
 
-        string sourceHash = HashFile(source);
         File.Copy(source, target, overwrite: true);
         state.InstalledSha256 = sourceHash;
         File.WriteAllText(statePath, JsonSerializer.Serialize(state, new JsonSerializerOptions { WriteIndented = true }));
