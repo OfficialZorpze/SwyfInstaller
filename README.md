@@ -209,7 +209,7 @@ or modified game DLLs.
 
 ## Troubleshooting
 
-Custom AI v1.1.5 targets full release build **26003210** (Steam app **4954910**).
+Custom AI recognizes full-release Steam builds **26003210** and **26529552** (Steam app **4954910**).
 With custom AI enabled,
 prompt preparation uses the game's shipped local rules; turning custom AI off
 preserves the original game route. The hosted service accepts bounded caller
