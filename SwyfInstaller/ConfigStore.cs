@@ -8,7 +8,7 @@ public static class Store
     public sealed class AppConfig
     {
         public string GameDir { get; set; } = "";
-        public string Repo { get; set; } = "manifest-dex/SwyfInstaller";
+        public string Repo { get; set; } = "OfficialZorpze/SwyfInstaller";
         public string InstalledTag { get; set; } = "";
     }
 
@@ -38,10 +38,14 @@ public static class Store
                 var cfg = JsonSerializer.Deserialize<AppConfig>(File.ReadAllText(ConfigPath));
                 if (cfg != null)
                 {
-                    if (string.IsNullOrWhiteSpace(cfg.Repo)) cfg.Repo = "manifest-dex/SwyfInstaller";
+                    if (string.IsNullOrWhiteSpace(cfg.Repo)) cfg.Repo = "OfficialZorpze/SwyfInstaller";
                     // Migrate configs pointing at the old standalone mod repo (merged into custom-ai/ + deleted).
-                    if (string.Equals(cfg.Repo.Trim(), "manifest-dex/swyf-custom-ai-mod", StringComparison.OrdinalIgnoreCase))
-                        cfg.Repo = "manifest-dex/SwyfInstaller";
+                    if (string.Equals(cfg.Repo.Trim(), "manifest-dex/swyf-custom-ai-mod", StringComparison.OrdinalIgnoreCase) ||
+                        string.Equals(cfg.Repo.Trim(), "manifest-dex/SwyfInstaller", StringComparison.OrdinalIgnoreCase))
+                    {
+                        cfg.Repo = "OfficialZorpze/SwyfInstaller";
+                        try { SaveConfig(cfg); } catch { }
+                    }
                     if (GameDir.MigratePlaytest(cfg, GameDir.FindCandidates()))
                     {
                         try { SaveConfig(cfg); } catch { }
