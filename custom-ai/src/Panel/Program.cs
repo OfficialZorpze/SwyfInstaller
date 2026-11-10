@@ -185,6 +185,7 @@ public sealed class Provider : IDisposable
             // Keep one idempotency key for the entire logical completion. Retries must
             // be recognized by ManifestDeX as the same request, not new generations.
             var idempotencyKey = Guid.NewGuid().ToString("N");
+            var idempotencyRestarts = 0;
             for (var attempt = 0; ; attempt++)
             {
             var payload = body.ToJsonString();
@@ -206,6 +207,22 @@ public sealed class Provider : IDisposable
                     else if (response.Content.Headers.TryGetValues(name, out values)) diagnosticHeaders[name] = string.Join(", ", values);
                 }
                 var diagnostic = JsonSerializer.Serialize(new { httpStatus = code, headers = diagnosticHeaders, body = errorBody.Length > 16000 ? errorBody[..16000] + " [truncated]" : errorBody });
+                // ManifestDeX can report that an idempotency key belongs to a request
+                // that has already completed. That key cannot be replayed for a fresh
+                // inference; issue one new logical request with a fresh key instead.
+                if (settings.BaseUrl == ManifestDeXClient.ServiceUrl + "/v1" &&
+                    code == 409 && idempotencyRestarts < 1)
+                {
+                    string? hostedError = null;
+                    try { hostedError = JsonNode.Parse(errorBytes)?["error"]?.GetValue<string>(); }
+                    catch (JsonException) { }
+                    if (string.Equals(hostedError, "idempotency", StringComparison.OrdinalIgnoreCase))
+                    {
+                        idempotencyKey = Guid.NewGuid().ToString("N");
+                        idempotencyRestarts++;
+                        continue;
+                    }
+                }
                 // Hosted inference can briefly return overload/gateway responses even for
                 // an active Pro member. Retry transient HTTP statuses, not auth/schema errors.
                 if (settings.BaseUrl == ManifestDeXClient.ServiceUrl + "/v1" &&
