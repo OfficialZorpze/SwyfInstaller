@@ -182,16 +182,15 @@ public sealed class Provider : IDisposable
             bool IsInherited(string parameter) => parameter == "temperature" ? !settings.Temperature.HasValue : !settings.TopP.HasValue;
             foreach (var parameter in new[] { "temperature", "top_p" })
                 if (IsInherited(parameter) && unsupportedDefaults.ContainsKey((settings.BaseUrl, settings.Model, parameter))) body.Remove(parameter);
-            // Keep one idempotency key for the entire logical completion. Retries must
-            // be recognized by ManifestDeX as the same request, not new generations.
-            var idempotencyKey = Guid.NewGuid().ToString("N");
-            var idempotencyRestarts = 0;
             for (var attempt = 0; ; attempt++)
             {
             var payload = body.ToJsonString();
             if (Encoding.UTF8.GetByteCount(payload) > MaxRequest) throw new ApiFailure(413, "size", "The request is too large.");
             using var request = new HttpRequestMessage(HttpMethod.Post, settings.BaseUrl.TrimEnd('/') + "/chat/completions");
-            if (settings.BaseUrl == ManifestDeXClient.ServiceUrl + "/v1") {request.Headers.Add("X-CustomAI-Background", isBackground ? "1" : "0");request.Headers.Add("Idempotency-Key",idempotencyKey);}
+            // Match upstream: every HTTP attempt is a distinct inference request.
+            // Reusing a key after a timeout/gateway error can replay a completed
+            // generation and produce ManifestDeX's "already finished" 409.
+            if (settings.BaseUrl == ManifestDeXClient.ServiceUrl + "/v1") {request.Headers.Add("X-CustomAI-Background", isBackground ? "1" : "0");request.Headers.Add("Idempotency-Key",Guid.NewGuid().ToString("N"));}
             if (settings.ApiKey.Length > 0) request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", settings.ApiKey);
             request.Content = new StringContent(payload, Encoding.UTF8, "application/json");
             using var response = await http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, token);
@@ -207,29 +206,6 @@ public sealed class Provider : IDisposable
                     else if (response.Content.Headers.TryGetValues(name, out values)) diagnosticHeaders[name] = string.Join(", ", values);
                 }
                 var diagnostic = JsonSerializer.Serialize(new { httpStatus = code, headers = diagnosticHeaders, body = errorBody.Length > 16000 ? errorBody[..16000] + " [truncated]" : errorBody });
-                // ManifestDeX can report that an idempotency key belongs to a request
-                // that has already completed. That key cannot be replayed for a fresh
-                // inference; issue one new logical request with a fresh key instead.
-                if (settings.BaseUrl == ManifestDeXClient.ServiceUrl + "/v1" &&
-                    code == 409 && idempotencyRestarts < 1)
-                {
-                    string? hostedError = null;
-                    try { hostedError = JsonNode.Parse(errorBytes)?["error"]?.GetValue<string>(); }
-                    catch (JsonException) { }
-                    if (string.Equals(hostedError, "idempotency", StringComparison.OrdinalIgnoreCase))
-                    {
-                        // The hosted gateway supplies Retry-After on this conflict. Give
-                        // its completed-request/session state time to settle before starting
-                        // the replacement request with a new idempotency key.
-                        var restartDelay = response.Headers.RetryAfter?.Delta ??
-                            (response.Headers.RetryAfter?.Date - DateTimeOffset.UtcNow) ??
-                            TimeSpan.FromSeconds(2);
-                        await Task.Delay(TimeSpan.FromMilliseconds(Math.Clamp(restartDelay.TotalMilliseconds, 1000, 10000)), token);
-                        idempotencyKey = Guid.NewGuid().ToString("N");
-                        idempotencyRestarts++;
-                        continue;
-                    }
-                }
                 // Hosted inference can briefly return overload/gateway responses even for
                 // an active Pro member. Retry transient HTTP statuses, not auth/schema errors.
                 if (settings.BaseUrl == ManifestDeXClient.ServiceUrl + "/v1" &&
