@@ -218,6 +218,13 @@ public sealed class Provider : IDisposable
                     catch (JsonException) { }
                     if (string.Equals(hostedError, "idempotency", StringComparison.OrdinalIgnoreCase))
                     {
+                        // The hosted gateway supplies Retry-After on this conflict. Give
+                        // its completed-request/session state time to settle before starting
+                        // the replacement request with a new idempotency key.
+                        var restartDelay = response.Headers.RetryAfter?.Delta ??
+                            (response.Headers.RetryAfter?.Date - DateTimeOffset.UtcNow) ??
+                            TimeSpan.FromSeconds(2);
+                        await Task.Delay(TimeSpan.FromMilliseconds(Math.Clamp(restartDelay.TotalMilliseconds, 1000, 10000)), token);
                         idempotencyKey = Guid.NewGuid().ToString("N");
                         idempotencyRestarts++;
                         continue;
